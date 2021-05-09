@@ -1,0 +1,5 @@
+.DS_Store
+*.log
+single.sol
+node_modules/
+build/
