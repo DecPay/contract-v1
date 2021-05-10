@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract DecPay is Ownable, ReentrancyGuard {
     // Order Model
-    struct ORDER {
+    struct AppOrderModel {
         // Application name
         string app;
         // OrderNo
@@ -25,24 +25,37 @@ contract DecPay is Ownable, ReentrancyGuard {
         address paidAddress;
     }
 
+    // Application Count
+    uint256 internal appCount;
+
+    // OrderCount
+    uint256 internal orderCount;
+
     // Applications List
     mapping(string => address payable) internal apps;
-
-    // Application Balance
-    mapping(string => uint256) internal appBalance;
-
-    // Application Orders
-    mapping(string => mapping(string => ORDER)) internal appOrders;
-
-    // Application Token Balance
-    mapping(string => mapping(string => uint256)) internal appTokenBalance;
-
-    // Tokens
-    mapping(string => ERC20) internal tokens;
 
     // Application Status
     mapping(string => bool) internal appStatus;
 
+    // Application ETH Balance
+    mapping(string => uint256) internal appBalance;
+
+    // Application Token Balance
+    mapping(string => mapping(string => uint256)) internal appTokenBalance;
+
+    // Application Orders
+    mapping(string => mapping(string => AppOrderModel)) internal appOrders;
+
+    // Application Order Count
+    mapping(string => uint256) internal appOrderCount;
+
+    // Application OrderNo List
+    mapping(string => string[]) internal appOrderNoList;
+
+    // Tokens
+    mapping(string => ERC20) internal tokens;
+
+    // ----- Event Start -----
     // Payment Success event
     event PaySuccessEvent(
         string _app,
@@ -59,6 +72,9 @@ contract DecPay is Ownable, ReentrancyGuard {
     // Created Application
     event ApplicationCreatedEvent(string _app, address _owner);
 
+    // ----- Event End -----
+
+    // ----- Modifier Start -----
     // modifies
     modifier appOwner(string memory _app) {
         require(apps[_app] == _msgSender(), "DecPay: No permission");
@@ -77,16 +93,72 @@ contract DecPay is Ownable, ReentrancyGuard {
         _;
     }
 
+    // ----- Modifier End -----
+
+    function getAppCount() public view returns (uint256) {
+        return appCount;
+    }
+
+    function getOrderCount() public view returns (uint256) {
+        return orderCount;
+    }
+
     // Create Application
     function createApp(string memory _app, address payable _ownerAddress)
         public
     {
         require(apps[_app] == address(0), "DecPay: Application has exist");
-        require(_msgSender() == _ownerAddress, "DecPay: No permission");
 
         apps[_app] = _ownerAddress;
 
+        appCount += 1;
+
         emit ApplicationCreatedEvent(_app, _msgSender());
+    }
+
+    // Application Query
+    function queryApp(string memory _app) public view returns (address) {
+        return apps[_app];
+    }
+
+    // Application OrderCount
+    function queryAppOrderCount(string memory _app)
+        public
+        view
+        returns (uint256)
+    {
+        return appOrderCount[_app];
+    }
+
+    // Application OrderCount MultiQuery
+    function queryAppOrderCountMulti(string[] memory _apps)
+        public
+        view
+        returns (uint256[] memory)
+    {
+        uint256[] memory arr = new uint256[](_apps.length);
+
+        for (uint256 i = 0; i < _apps.length; i++) {
+            arr[i] = appOrderCount[_apps[i]];
+        }
+
+        return arr;
+    }
+
+    function getAppOrderNoPaginate(
+        string memory _app,
+        uint256 _start,
+        uint256 size
+    ) public view appMustExist(_app) returns (string[] memory) {
+        require(appOrderCount[_app] >= (_start + size), "DecPay: Params error");
+
+        string[] memory orderNoList = new string[](size);
+
+        for (uint256 i = 0; i < size; i++) {
+            orderNoList[i] = appOrderNoList[_app][i + _start];
+        }
+
+        return orderNoList;
     }
 
     // Set Application Status
@@ -107,6 +179,7 @@ contract DecPay is Ownable, ReentrancyGuard {
         return appBalance[_app];
     }
 
+    // Application Token Balance query
     function queryAppTokenBalance(string memory _app, string memory _token)
         public
         view
@@ -115,15 +188,20 @@ contract DecPay is Ownable, ReentrancyGuard {
         return appTokenBalance[_app][_token];
     }
 
-    function queryOrders(string memory _app, string[] memory _orderNoRows)
+    // Application Order MultiQuery
+    function queryOrderMulti(string memory _app, string[] memory _orderNoRows)
         public
         view
-        returns (ORDER[] memory)
+        appMustExist(_app)
+        returns (AppOrderModel[] memory)
     {
-        ORDER[] memory orders = new ORDER[](_orderNoRows.length);
+        AppOrderModel[] memory orders =
+            new AppOrderModel[](_orderNoRows.length);
+
         for (uint256 i = 0; i < _orderNoRows.length; i++) {
             orders[i] = appOrders[_app][_orderNoRows[i]];
         }
+
         return orders;
     }
 
@@ -139,7 +217,7 @@ contract DecPay is Ownable, ReentrancyGuard {
             address
         )
     {
-        ORDER memory localOrder = appOrders[_app][_orderNo];
+        AppOrderModel memory localOrder = appOrders[_app][_orderNo];
         return (
             localOrder.token,
             localOrder.total,
@@ -168,7 +246,7 @@ contract DecPay is Ownable, ReentrancyGuard {
             "DecPay: Order already exists"
         );
 
-        appOrders[_app][_orderNo] = ORDER(
+        appOrders[_app][_orderNo] = AppOrderModel(
             _app,
             _orderNo,
             "",
@@ -179,6 +257,11 @@ contract DecPay is Ownable, ReentrancyGuard {
         );
 
         appBalance[_app] += msg.value;
+
+        // statistics
+        orderCount += 1;
+        appOrderCount[_app] += 1;
+        appOrderNoList[_app].push(_orderNo);
 
         emit PaySuccessEvent(
             _app,
@@ -213,7 +296,7 @@ contract DecPay is Ownable, ReentrancyGuard {
 
         appTokenBalance[_app][_token] += _total;
 
-        appOrders[_app][_orderNo] = ORDER(
+        appOrders[_app][_orderNo] = AppOrderModel(
             _app,
             _orderNo,
             _token,
@@ -222,6 +305,11 @@ contract DecPay is Ownable, ReentrancyGuard {
             block.timestamp,
             _msgSender()
         );
+
+        // statistics
+        orderCount += 1;
+        appOrderCount[_app] += 1;
+        appOrderNoList[_app].push(_orderNo);
 
         emit PaySuccessEvent(
             _app,
@@ -275,14 +363,5 @@ contract DecPay is Ownable, ReentrancyGuard {
         onlyOwner
     {
         tokens[_name] = _tokenAddress;
-    }
-
-    function ownerCreateApp(string memory _app, address payable _appOwner)
-        public
-        onlyOwner
-    {
-        require(apps[_app] == address(0), "DecPay: Application has exists");
-        apps[_app] = _appOwner;
-        emit ApplicationCreatedEvent(_app, _appOwner);
     }
 }

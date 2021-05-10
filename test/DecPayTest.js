@@ -8,29 +8,14 @@ const TTToken = artifacts.require("TTToken");
 contract('DecPay', async accounts => {
 
     it('create application success not exists', async () => {
-        let instance = await DecPay.deployed();
-        let result = await instance.createApp('decpay1', accounts[0], { from: accounts[0] });
+        let instance = await DecPay.new({ from: accounts[2] });
+        let result = await instance.createApp('decpay1', accounts[1], { from: accounts[0] });
 
         assert.equal('ApplicationCreatedEvent', result.logs[0].event);
     })
 
-    it('create application error address params', async () => {
-        let instance = await DecPay.deployed();
-        try {
-            await instance.createApp('decpay2', accounts[0], { from: accounts[1] });
-        } catch (e) {
-            assert.equal('DecPay: No permission', e.reason);
-        }
-
-        try {
-            await instance.createApp('decpay2', accounts[1], { from: accounts[0] });
-        } catch (e) {
-            assert.equal('DecPay: No permission', e.reason);
-        }
-    })
-
     it('create application error when application has exist', async () => {
-        let instance = await DecPay.deployed();
+        let instance = await DecPay.new({ from: accounts[2] });
         let result = await instance.createApp('decpay3', accounts[0], { from: accounts[0] });
 
         assert.equal('ApplicationCreatedEvent', result.logs[0].event);
@@ -42,8 +27,42 @@ contract('DecPay', async accounts => {
         }
     })
 
+    it('queryApp test', async () => {
+        let instance = await DecPay.new({ from: accounts[2] });
+
+        let _app = 'decpay1-2';
+
+        let appOwner = await instance.queryApp(_app);
+        assert.equal('0x0000000000000000000000000000000000000000', appOwner);
+
+        await instance.createApp(_app, accounts[1], { from: accounts[0] });
+
+        appOwner = await instance.queryApp(_app);
+        assert.equal(accounts[1], appOwner);
+    })
+
+    it('appCount test', async () => {
+        let instance = await DecPay.new({ from: accounts[2] });
+        await instance.createApp('decpay1', accounts[1], { from: accounts[0] });
+
+        let appCount = await instance.getAppCount();
+        assert.equal(1, appCount);
+
+        await instance.createApp('decpay1-1', accounts[1], { from: accounts[0] });
+
+        appCount = await instance.getAppCount();
+        assert.equal(2, appCount);
+
+        await instance.createApp('decpay1-2', accounts[1], { from: accounts[0] });
+        await instance.createApp('decpay1-3', accounts[1], { from: accounts[0] });
+        await instance.createApp('decpay1-4', accounts[1], { from: accounts[0] });
+
+        appCount = await instance.getAppCount();
+        assert.equal(5, appCount);
+    })
+
     it('application default status is false', async () => {
-        let instance = await DecPay.deployed();
+        let instance = await DecPay.new({ from: accounts[2] });
         let _app = 'decpay4';
         await instance.createApp(_app, accounts[0], { from: accounts[0] });
         let result = await instance.getAppStatus(_app);
@@ -52,7 +71,7 @@ contract('DecPay', async accounts => {
 
 
     it('set app status success', async () => {
-        let instance = await DecPay.deployed();
+        let instance = await DecPay.new({ from: accounts[2] });
         let _app = 'decpay5';
         await instance.createApp(_app, accounts[0], { from: accounts[0] });
         await instance.setAppStatus(_app, true, { from: accounts[0] });
@@ -61,7 +80,7 @@ contract('DecPay', async accounts => {
     })
 
     it('set app status failure with non owner', async () => {
-        let instance = await DecPay.deployed();
+        let instance = await DecPay.new({ from: accounts[2] });
         let _app = 'decpay6';
         await instance.createApp(_app, accounts[0], { from: accounts[0] });
         try {
@@ -72,7 +91,7 @@ contract('DecPay', async accounts => {
     })
 
     it('application balance default is zero', async () => {
-        let instance = await DecPay.deployed();
+        let instance = await DecPay.new({ from: accounts[2] });
         let _app = 'decpay7';
         await instance.createApp(_app, accounts[0], { from: accounts[0] });
         let result = await instance.queryAppBalance(_app);
@@ -87,7 +106,7 @@ contract('DecPay', async accounts => {
             _expiredAt: 1841480283 // 2028/05/9
         }
 
-        let instance = await DecPay.deployed();
+        let instance = await DecPay.new({ from: accounts[2] });
         await instance.createApp(order._app, accounts[0], { from: accounts[0] });
 
         // pay
@@ -119,6 +138,15 @@ contract('DecPay', async accounts => {
         assert.equal(order._total, createdOrder[1]);
         assert.equal(order._total, createdOrder[2]);
         assert.equal(accounts[1], createdOrder[4]);
+
+        // orderCount
+        let orderCount = await instance.getOrderCount();
+        assert.equal(1, orderCount);
+
+        // appOrderCount
+        let appOrderCount = await instance.queryAppOrderCount(order._app);
+        assert.equal(1, appOrderCount);
+
     })
 
     it('eth pay fail with no pay eth or wrong value', async () => {
@@ -129,7 +157,7 @@ contract('DecPay', async accounts => {
             _expiredAt: 1841480283 // 2028/05/9
         }
 
-        let instance = await DecPay.deployed();
+        let instance = await DecPay.new({ from: accounts[2] });
         await instance.createApp(order._app, accounts[0], { from: accounts[0] });
 
         // pay
@@ -187,7 +215,7 @@ contract('DecPay', async accounts => {
             _expiredAt: 1620555483 // 2021/05/9 18:18
         }
 
-        let instance = await DecPay.deployed();
+        let instance = await DecPay.new({ from: accounts[2] });
         await instance.createApp(order._app, accounts[0], { from: accounts[0] });
 
         // pay
@@ -215,7 +243,7 @@ contract('DecPay', async accounts => {
             _expiredAt: 1841480283 // 2028/05/9
         }
 
-        let instance = await DecPay.deployed();
+        let instance = await DecPay.new({ from: accounts[2] });
         await instance.createApp(order._app, accounts[0], { from: accounts[0] });
 
         // pay
@@ -344,6 +372,14 @@ contract('DecPay', async accounts => {
         // queryDecPayTokenBalance
         let decpayTokenBalance = await erc20Instance.balanceOf(instance.address);
         assert.equal(order._total, decpayTokenBalance);
+
+        // orderCount
+        let orderCount = await instance.getOrderCount();
+        assert.equal(1, orderCount);
+
+        // appOrderCount
+        let appOrderCount = await instance.queryAppOrderCount(order._app);
+        assert.equal(1, appOrderCount);
     });
 
     it('erc20 token pay fail when order has exist', async () => {
@@ -586,7 +622,7 @@ contract('DecPay', async accounts => {
             _expiredAt: 1841480283 // 2028/05/9
         }
 
-        let instance = await DecPay.deployed();
+        let instance = await DecPay.new({ from: accounts[2] });
         await instance.createApp(order._app, accounts[0], { from: accounts[0] });
 
         // pay
@@ -630,7 +666,7 @@ contract('DecPay', async accounts => {
     });
 
     it('withdraw fail with non owner submit', async () => {
-        let instance = await DecPay.deployed();
+        let instance = await DecPay.new({ from: accounts[2] });
         await instance.createApp('decpay24', accounts[0], { from: accounts[0] });
 
         try {
@@ -641,7 +677,7 @@ contract('DecPay', async accounts => {
     });
 
     it('withdraw fail when balance insufficient', async () => {
-        let instance = await DecPay.deployed();
+        let instance = await DecPay.new({ from: accounts[2] });
         await instance.createApp('decpay25', accounts[0], { from: accounts[0] });
 
         try {
@@ -747,33 +783,319 @@ contract('DecPay', async accounts => {
         }
     })
 
-    it('owner create application', async () => {
-        let mainContractOwner = accounts[3];
-        // main contract - owner[accounts[3]]
-        let instance = await DecPay.new({ from: mainContractOwner });
+    it('queryAppOrderCount and queryAppOrderCountMulti test with eth pay', async () => {
+        let order = {
+            _app: 'decpay29',
+            _orderNo: 'orderNo29',
+            _total: 100,
+            _expiredAt: 1841480283 // 2028/05/9
+        }
+        let order1 = {
+            _app: 'decpay30',
+            _orderNo: 'orderNo30',
+            _total: 100,
+            _expiredAt: 1841480283 // 2028/05/9
+        }
 
-        let result = await instance.ownerCreateApp('decpay29', accounts[3], {
-            from: mainContractOwner
-        });
+        let instance = await DecPay.new({ from: accounts[2] });
 
-        let log = result.logs[0];
-        assert.equal('ApplicationCreatedEvent', log.event);
-        assert.equal('decpay29', log.args[0]);
-        assert.equal(accounts[3], log.args[1]);
+        await instance.createApp(order._app, accounts[0]);
+        await instance.createApp(order1._app, accounts[1]);
+
+        // pay
+        await instance.pay(
+            order._app,
+            order._orderNo,
+            order._total,
+            order._expiredAt,
+            {
+                from: accounts[1],
+                value: order._total
+            }
+        );
+
+        let appOrderCount = await instance.queryAppOrderCount(order._app);
+        assert.equal(1, appOrderCount);
+
+        // multiQuery
+        let appOrderCountMulti = await instance.queryAppOrderCountMulti([order._app, order1._app]);
+        assert.equal(1, appOrderCountMulti[0]);
+        assert.equal(0, appOrderCountMulti[1]);
+
+        // pay
+        await instance.pay(
+            order1._app,
+            order1._orderNo,
+            order1._total,
+            order1._expiredAt,
+            {
+                from: accounts[4],
+                value: order1._total
+            }
+        );
+
+        let app1OrderCount = await instance.queryAppOrderCount(order1._app);
+        assert.equal(1, app1OrderCount);
+
+        // multiQuery
+        appOrderCountMulti = await instance.queryAppOrderCountMulti([order._app, order1._app]);
+        assert.equal(1, appOrderCountMulti[0]);
+        assert.equal(1, appOrderCountMulti[1]);
+
+        // pay
+        order._orderNo = 'orderNo29-1';
+        await instance.pay(
+            order._app,
+            order._orderNo,
+            order._total,
+            order._expiredAt,
+            {
+                from: accounts[1],
+                value: order._total
+            }
+        );
+
+        let appOrderCount1 = await instance.queryAppOrderCount(order._app);
+        assert.equal(2, appOrderCount1);
+
+        // multiQuery
+        appOrderCountMulti = await instance.queryAppOrderCountMulti([order._app, order1._app]);
+        assert.equal(2, appOrderCountMulti[0]);
+        assert.equal(1, appOrderCountMulti[1]);
+
+        // query orderCount
+        let orderCount = await instance.getOrderCount();
+        assert.equal(3, orderCount);
     })
 
-    it('owner create application fail with non owner', async () => {
+    it('queryAppOrderCount and queryAppOrderCountMulti test with token pay', async () => {
+        let order = {
+            _app: 'decpay29',
+            _orderNo: 'orderNo29',
+            _total: 100,
+            _token: 'TT',
+            _expiredAt: 1841480283 // 2028/05/9
+        }
+        let order1 = {
+            _app: 'decpay30',
+            _orderNo: 'orderNo30',
+            _token: 'TT',
+            _total: 100,
+            _expiredAt: 1841480283 // 2028/05/9
+        }
+
         let mainContractOwner = accounts[3];
         // main contract - owner[accounts[3]]
         let instance = await DecPay.new({ from: mainContractOwner });
 
-        try {
-            await instance.ownerCreateApp('decpay29', accounts[1], {
-                from: accounts[4]
-            });
-        } catch (e) {
-            assert.equal('Ownable: caller is not the owner', e.reason);
+        await instance.createApp(order._app, accounts[0]);
+        await instance.createApp(order1._app, accounts[1]);
+
+        // erc20 contract deployed
+        let erc20Instance = await TTToken.new(200000000, { from: mainContractOwner });
+        let ttTokenAddress = erc20Instance.address;
+        // set erc20 support
+        await instance.addToken(order._token, ttTokenAddress, { from: mainContractOwner });
+
+        let spenderAddress = accounts[1];
+
+        // trnasfer tt token
+        await erc20Instance.transfer(spenderAddress, 5000, { from: mainContractOwner });
+        // approve DecPay contract spend tt token
+        await erc20Instance.approve(instance.address, 5000, { from: spenderAddress });
+
+        // token pay
+        await instance.tokenPay(
+            order._app,
+            order._orderNo,
+            order._token,
+            order._total,
+            order._expiredAt,
+            {
+                from: spenderAddress
+            }
+        );
+
+        let appOrderCount = await instance.queryAppOrderCount(order._app);
+        assert.equal(1, appOrderCount);
+
+        // multiQuery
+        let appOrderCountMulti = await instance.queryAppOrderCountMulti([order._app, order1._app]);
+        assert.equal(1, appOrderCountMulti[0]);
+        assert.equal(0, appOrderCountMulti[1]);
+
+        // pay
+        // token pay
+        await instance.tokenPay(
+            order1._app,
+            order1._orderNo,
+            order1._token,
+            order1._total,
+            order1._expiredAt,
+            {
+                from: spenderAddress
+            }
+        );
+
+        let app1OrderCount = await instance.queryAppOrderCount(order1._app);
+        assert.equal(1, app1OrderCount);
+
+        // multiQuery
+        appOrderCountMulti = await instance.queryAppOrderCountMulti([order._app, order1._app]);
+        assert.equal(1, appOrderCountMulti[0]);
+        assert.equal(1, appOrderCountMulti[1]);
+
+        // pay
+        order._orderNo = 'orderNo29-1';
+        await instance.tokenPay(
+            order._app,
+            order._orderNo,
+            order._token,
+            order._total,
+            order._expiredAt,
+            {
+                from: spenderAddress
+            }
+        );
+
+        let appOrderCount1 = await instance.queryAppOrderCount(order._app);
+        assert.equal(2, appOrderCount1);
+
+        // multiQuery
+        appOrderCountMulti = await instance.queryAppOrderCountMulti([order._app, order1._app]);
+        assert.equal(2, appOrderCountMulti[0]);
+        assert.equal(1, appOrderCountMulti[1]);
+
+        // query orderCount
+        let orderCount = await instance.getOrderCount();
+        assert.equal(3, orderCount);
+    })
+
+
+    it('getAppOrderNoPaginate test with eth pay', async () => {
+        let order = {
+            _app: 'decpay32',
+            _orderNo: 'orderNo32',
+            _total: 100,
+            _expiredAt: 1841480283 // 2028/05/9
         }
+        let order1 = {
+            _app: 'decpay33',
+            _orderNo: 'orderNo33',
+            _total: 100,
+            _expiredAt: 1841480283 // 2028/05/9
+        }
+
+        let instance = await DecPay.new({ from: accounts[2] });
+
+        await instance.createApp(order._app, accounts[0]);
+        await instance.createApp(order1._app, accounts[1]);
+
+        // pay
+        await instance.pay(
+            order._app,
+            order._orderNo,
+            order._total,
+            order._expiredAt,
+            {
+                from: accounts[1],
+                value: order._total
+            }
+        );
+
+        let orders = await instance.getAppOrderNoPaginate(order._app, 0, 1);
+        assert.equal(order._orderNo, orders[0]);
+
+        // pay
+        await instance.pay(
+            order1._app,
+            order1._orderNo,
+            order1._total,
+            order1._expiredAt,
+            {
+                from: accounts[4],
+                value: order1._total
+            }
+        );
+
+        // pay
+        await instance.pay(
+            order._app,
+            'orderNo32-1',
+            order._total,
+            order._expiredAt,
+            {
+                from: accounts[1],
+                value: order._total
+            }
+        );
+
+        orders = await instance.getAppOrderNoPaginate(order._app, 0, 2);
+        assert.equal(order._orderNo, orders[0]);
+        assert.equal('orderNo32-1', orders[1]);
+    })
+
+    it('queryOrderMulti test with eth pay', async () => {
+        let order = {
+            _app: 'decpay32',
+            _orderNo: 'orderNo32',
+            _total: 100,
+            _expiredAt: 1841480283 // 2028/05/9
+        }
+        let order1 = {
+            _app: 'decpay33',
+            _orderNo: 'orderNo33',
+            _total: 100,
+            _expiredAt: 1841480283 // 2028/05/9
+        }
+
+        let instance = await DecPay.new({ from: accounts[2] });
+
+        await instance.createApp(order._app, accounts[0]);
+        await instance.createApp(order1._app, accounts[1]);
+
+        // pay
+        await instance.pay(
+            order._app,
+            order._orderNo,
+            order._total,
+            order._expiredAt,
+            {
+                from: accounts[1],
+                value: order._total
+            }
+        );
+
+        let orders = await instance.queryOrderMulti(order._app, [order._orderNo]);
+        assert.equal(order._orderNo, orders[0].orderNo);
+
+        // pay
+        await instance.pay(
+            order1._app,
+            order1._orderNo,
+            order1._total,
+            order1._expiredAt,
+            {
+                from: accounts[4],
+                value: order1._total
+            }
+        );
+
+        // pay
+        await instance.pay(
+            order._app,
+            'orderNo32-1',
+            order._total,
+            order._expiredAt,
+            {
+                from: accounts[1],
+                value: order._total
+            }
+        );
+
+        orders = await instance.queryOrderMulti(order._app, [order._orderNo, 'orderNo32-1']);
+        assert.equal(order._orderNo, orders[0].orderNo);
+        assert.equal('orderNo32-1', orders[1].orderNo);
     })
 
 });
