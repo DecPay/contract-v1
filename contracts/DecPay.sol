@@ -149,16 +149,16 @@ contract DecPay is Ownable, ReentrancyGuard {
         string memory _app,
         uint256 _start,
         uint256 size
-    ) public view appMustExist(_app) returns (string[] memory) {
+    ) public view appMustExist(_app) returns (AppOrderModel[] memory) {
         require(appOrderCount[_app] >= (_start + size), "DecPay: Params error");
 
-        string[] memory orderNoList = new string[](size);
+        AppOrderModel[] memory _orders = new AppOrderModel[](size);
 
         for (uint256 i = 0; i < size; i++) {
-            orderNoList[i] = appOrderNoList[_app][i + _start];
+            _orders[i] = appOrders[_app][appOrderNoList[_app][i + _start]];
         }
 
-        return orderNoList;
+        return _orders;
     }
 
     // Set Application Status
@@ -195,14 +195,14 @@ contract DecPay is Ownable, ReentrancyGuard {
         appMustExist(_app)
         returns (AppOrderModel[] memory)
     {
-        AppOrderModel[] memory orders =
+        AppOrderModel[] memory _orders =
             new AppOrderModel[](_orderNoRows.length);
 
         for (uint256 i = 0; i < _orderNoRows.length; i++) {
-            orders[i] = appOrders[_app][_orderNoRows[i]];
+            _orders[i] = appOrders[_app][_orderNoRows[i]];
         }
 
-        return orders;
+        return _orders;
     }
 
     // Check application orders

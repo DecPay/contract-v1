@@ -1004,7 +1004,7 @@ contract('DecPay', async accounts => {
         );
 
         let orders = await instance.getAppOrderNoPaginate(order._app, 0, 1);
-        assert.equal(order._orderNo, orders[0]);
+        assert.equal(order._orderNo, orders[0].orderNo);
 
         // pay
         await instance.pay(
@@ -1031,8 +1031,8 @@ contract('DecPay', async accounts => {
         );
 
         orders = await instance.getAppOrderNoPaginate(order._app, 0, 2);
-        assert.equal(order._orderNo, orders[0]);
-        assert.equal('orderNo32-1', orders[1]);
+        assert.equal(order._orderNo, orders[0].orderNo);
+        assert.equal('orderNo32-1', orders[1].orderNo);
     })
 
     it('queryOrderMulti test with eth pay', async () => {
