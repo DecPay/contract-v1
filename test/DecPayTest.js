@@ -134,10 +134,10 @@ contract('DecPay', async accounts => {
         assert.equal(order._total, balance);
         // orderQuery
         let createdOrder = await instance.queryOrder(order._app, order._orderNo);
-        assert.equal('', createdOrder[0]);
-        assert.equal(order._total, createdOrder[1]);
-        assert.equal(order._total, createdOrder[2]);
-        assert.equal(accounts[1], createdOrder[4]);
+        assert.equal('', createdOrder.token);
+        assert.equal(order._total, createdOrder.total);
+        assert.equal(order._total, createdOrder.total);
+        assert.equal(accounts[1], createdOrder.paidAddress);
 
         // orderCount
         let orderCount = await instance.getOrderCount();
@@ -360,10 +360,10 @@ contract('DecPay', async accounts => {
 
         // orderQuery
         let createdOrder = await instance.queryOrder(order._app, order._orderNo);
-        assert.equal(order._token, createdOrder[0]);
-        assert.equal(order._total, createdOrder[1]);
-        assert.equal(order._total, createdOrder[2]);
-        assert.equal(spenderAddress, createdOrder[4]);
+        assert.equal(order._token, createdOrder.token);
+        assert.equal(order._total, createdOrder.total);
+        assert.equal(order._total, createdOrder.total);
+        assert.equal(spenderAddress, createdOrder.paidAddress);
 
         // queryTokenBalance
         let tokenBalance = await instance.queryAppTokenBalance(order._app, order._token, { from: accounts[5] });
@@ -1097,5 +1097,171 @@ contract('DecPay', async accounts => {
         assert.equal(order._orderNo, orders[0].orderNo);
         assert.equal('orderNo32-1', orders[1].orderNo);
     })
+
+    it('eth pay fail with app pause', async () => {
+        let order = {
+            _app: 'decpay33',
+            _orderNo: 'orderNo33',
+            _total: 100000,
+            _expiredAt: 1620555483 // 2021/05/9 18:18
+        }
+
+        let instance = await DecPay.new({ from: accounts[2] });
+        await instance.createApp(order._app, accounts[0], { from: accounts[0] });
+        await instance.setAppStatus(order._app, true);
+
+        // pay
+        try {
+            await instance.pay(
+                order._app,
+                order._orderNo,
+                order._total,
+                order._expiredAt,
+                {
+                    from: accounts[1],
+                    value: order._total
+                }
+            );
+        } catch (e) {
+            assert.equal('DecPay: Application paused', e.reason);
+        }
+    });
+
+    it('erc20 token pay fail with app pause', async () => {
+        let order = {
+            _app: 'decpay34',
+            _orderNo: 'orderNo34',
+            _token: 'TT',
+            _total: 100000,
+            _expiredAt: 1841480283 // 2028/05/9
+        }
+
+        let mainContractOwner = accounts[3];
+        // main contract - owner[accounts[3]]
+        let instance = await DecPay.new({ from: mainContractOwner });
+        // erc20 contract deployed
+        let erc20Instance = await TTToken.new(200000000, { from: mainContractOwner });
+        let ttTokenAddress = erc20Instance.address;
+        // set erc20 support
+        await instance.addToken(order._token, ttTokenAddress, { from: mainContractOwner });
+
+        // register application
+        await instance.createApp(order._app, accounts[0], { from: accounts[0] });
+        await instance.setAppStatus(order._app, true);
+
+        let spenderAddress = accounts[1];
+
+        // trnasfer tt token
+        await erc20Instance.transfer(spenderAddress, order._total * 2, { from: mainContractOwner });
+        // approve DecPay contract spend tt token
+        await erc20Instance.approve(instance.address, order._total, { from: spenderAddress });
+
+        try {
+            await instance.tokenPay(
+                order._app,
+                order._orderNo,
+                order._token,
+                order._total,
+                order._expiredAt,
+                {
+                    from: spenderAddress
+                }
+            );
+        } catch (e) {
+            assert.equal('DecPay: Application paused', e.reason);
+        }
+    });
+
+    it('set token status success', async () => {
+        let mainContractOwner = accounts[3];
+        // main contract - owner[accounts[3]]
+        let instance = await DecPay.new({ from: mainContractOwner });
+        // erc20 contract deployed
+        let erc20Instance = await TTToken.new(200000000, { from: mainContractOwner });
+        let ttTokenAddress = erc20Instance.address;
+        // set erc20 support
+        await instance.addToken('TT', ttTokenAddress, { from: mainContractOwner });
+
+        let tokenStatus = await instance.getTokenStatus('TT');
+        assert.isNotOk(tokenStatus);
+
+        await instance.setTokenStaus('TT', true, { from: mainContractOwner });
+
+        tokenStatus = await instance.getTokenStatus('TT');
+        assert.isOk(tokenStatus);
+    });
+
+    it('set token status fail with non owner', async () => {
+        let mainContractOwner = accounts[3];
+        // main contract - owner[accounts[3]]
+        let instance = await DecPay.new({ from: mainContractOwner });
+        // erc20 contract deployed
+        let erc20Instance = await TTToken.new(200000000, { from: mainContractOwner });
+        let ttTokenAddress = erc20Instance.address;
+        // set erc20 support
+        await instance.addToken('TT', ttTokenAddress, { from: mainContractOwner });
+
+        try {
+            await instance.setTokenStaus('TT', true, { from: accounts[1] });
+        } catch (e) {
+            assert.equal('Ownable: caller is not the owner', e.reason);
+        }
+    })
+
+    it('set token status fail with token not exist', async () => {
+        let mainContractOwner = accounts[3];
+        let instance = await DecPay.new({ from: mainContractOwner });
+        try {
+            await instance.setTokenStaus('TT', true, { from: mainContractOwner });
+        } catch (e) {
+            assert.equal('DecPay: token has not exist', e.reason);
+        }
+    })
+
+    it('erc20 token pay fail with token pause', async () => {
+        let order = {
+            _app: 'decpay35',
+            _orderNo: 'orderNo35',
+            _token: 'TT',
+            _total: 100000,
+            _expiredAt: 1841480283 // 2028/05/9
+        }
+
+        let mainContractOwner = accounts[3];
+        // main contract - owner[accounts[3]]
+        let instance = await DecPay.new({ from: mainContractOwner });
+        // erc20 contract deployed
+        let erc20Instance = await TTToken.new(200000000, { from: mainContractOwner });
+        let ttTokenAddress = erc20Instance.address;
+        // set erc20 support
+        await instance.addToken(order._token, ttTokenAddress, { from: mainContractOwner });
+
+        // register application
+        await instance.createApp(order._app, accounts[0], { from: accounts[0] });
+        await instance.setTokenStaus(order._token, true, { from: mainContractOwner });
+
+        let spenderAddress = accounts[1];
+
+        // trnasfer tt token
+        await erc20Instance.transfer(spenderAddress, order._total * 2, { from: mainContractOwner });
+        // approve DecPay contract spend tt token
+        await erc20Instance.approve(instance.address, order._total, { from: spenderAddress });
+
+        try {
+            await instance.tokenPay(
+                order._app,
+                order._orderNo,
+                order._token,
+                order._total,
+                order._expiredAt,
+                {
+                    from: spenderAddress
+                }
+            );
+        } catch (e) {
+            assert.equal('DecPay: token unsupport', e.reason);
+        }
+    });
+
 
 });

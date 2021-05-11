@@ -55,6 +55,9 @@ contract DecPay is Ownable, ReentrancyGuard {
     // Tokens
     mapping(string => ERC20) internal tokens;
 
+    // Token Status
+    mapping(string => bool) internal tokenStatus;
+
     // ----- Event Start -----
     // Payment Success event
     event PaySuccessEvent(
@@ -209,22 +212,9 @@ contract DecPay is Ownable, ReentrancyGuard {
     function queryOrder(string memory _app, string memory _orderNo)
         public
         view
-        returns (
-            string memory,
-            uint256,
-            uint256,
-            uint256,
-            address
-        )
+        returns (AppOrderModel memory)
     {
-        AppOrderModel memory localOrder = appOrders[_app][_orderNo];
-        return (
-            localOrder.token,
-            localOrder.total,
-            localOrder.payTotal,
-            localOrder.paidTimestamp,
-            localOrder.paidAddress
-        );
+        return appOrders[_app][_orderNo];
     }
 
     // ETH Pay
@@ -284,6 +274,8 @@ contract DecPay is Ownable, ReentrancyGuard {
             address(tokens[_token]) != address(0),
             "DecPay: token has not exist"
         );
+
+        require(tokenStatus[_token] == false, "DecPay: token unsupport");
 
         require(_expiredAt > block.timestamp, "DecPay: Order has expired");
 
@@ -363,5 +355,20 @@ contract DecPay is Ownable, ReentrancyGuard {
         onlyOwner
     {
         tokens[_name] = _tokenAddress;
+    }
+
+    function setTokenStaus(string memory _token, bool _status)
+        public
+        onlyOwner
+    {
+        require(
+            address(tokens[_token]) != address(0),
+            "DecPay: token has not exist"
+        );
+        tokenStatus[_token] = _status;
+    }
+
+    function getTokenStatus(string memory _token) public view returns (bool) {
+        return tokenStatus[_token];
     }
 }
