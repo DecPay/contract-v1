@@ -346,8 +346,8 @@ contract DecPay is Ownable, ReentrancyGuard {
         emit WithdrawSuccessEvent(_app, _token, _total);
     }
 
-    function queryToken(string memory _token) public view returns (ERC20) {
-        return tokens[_token];
+    function queryToken(string memory _token) public view returns (address) {
+        return address(tokens[_token]);
     }
 
     function addToken(string memory _name, ERC20 _tokenAddress)
