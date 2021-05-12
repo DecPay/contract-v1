@@ -1264,4 +1264,24 @@ contract('DecPay', async accounts => {
     });
 
 
+    it('reset app owner success', async () => {
+        let _app = 'decpay36';
+        let instance = await DecPay.new({ from: accounts[2] });
+        await instance.createApp(_app, accounts[1], { from: accounts[1] });
+
+        let appOwner = await instance.queryApp(_app);
+        assert.equal(accounts[1], appOwner);
+
+        await instance.resetAppOwner(_app, accounts[5], { from: accounts[1] });
+
+        appOwner = await instance.queryApp(_app);
+        assert.equal(accounts[5], appOwner);
+
+        try {
+            await instance.resetAppOwner(_app, accounts[5], { from: accounts[1] });
+        } catch (e) {
+            assert.equal('DecPay: No permission', e.reason);
+        }
+    })
+
 });

@@ -119,6 +119,13 @@ contract DecPay is Ownable, ReentrancyGuard {
         emit ApplicationCreatedEvent(_app, _msgSender());
     }
 
+    function resetAppOwner(string memory _app, address payable _ownerAddress)
+        public
+        appOwner(_app)
+    {
+        apps[_app] = _ownerAddress;
+    }
+
     // Application Query
     function queryApp(string memory _app) public view returns (address) {
         return apps[_app];
